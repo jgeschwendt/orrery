@@ -10,6 +10,7 @@ defmodule Orrery.Memory do
   the bank's `_archive/`, so every autonomous rewrite stays recoverable.
   """
 
+  alias Orrery.Memory.Locks
   alias Orrery.Transcripts
 
   @types ~w(feedback project reference user)
@@ -445,8 +446,23 @@ defmodule Orrery.Memory do
   # tampered request (`bank: "../.."`) can't escape the memory root.
   defp writable?(bank), do: not match?("auto:" <> _, bank) and Orrery.Store.component?(bank)
 
-  @doc "The single writer of a memory to disk — the canonical frontmatter + `<type>_<slug>.md` format authority. Archives any `replaces` files before writing (archive-over-delete), carries bi-temporal `created` lineage from the oldest superseded file, disambiguates slug collisions with numeric suffixes, clears the matching staging entry, and regens the bank index. Returns `:ok`, or `{:error, :not_writable}` for an auto/unsafe bank."
-  def commit_memory(f) do
+  # Serialize a short staging/bank read-modify-write behind the commit lock, so an
+  # in-app mutation never races the launchd sweep's own writes. Never wrap a claude
+  # call in here — the lock is milliseconds-held by contract. `{:error, :locked}` on
+  # budget exhaustion surfaces to the caller unchanged.
+  defp locked(fun) do
+    case Locks.with_lock(:commit, fun) do
+      {:ok, result} -> result
+      {:error, :locked} = err -> err
+    end
+  end
+
+  @doc "The single writer of a memory to disk — the canonical frontmatter + `<type>_<slug>.md` format authority. Archives any `replaces` files before writing (archive-over-delete), carries bi-temporal `created` lineage from the oldest superseded file, disambiguates slug collisions with numeric suffixes, clears the matching staging entry, and regens the bank index. Returns `:ok`, or `{:error, :not_writable}` for an auto/unsafe bank, or `{:error, :locked}` if the commit lock is contended past its budget."
+  def commit_memory(f), do: locked(fn -> do_commit_memory(f) end)
+
+  # The lock-free writer, callable by holders already inside the commit lock
+  # (restore/drain). Public callers reach it through `commit_memory/1`.
+  defp do_commit_memory(f) do
     if writable?(f.bank) do
       dir = Path.join(memory_root(), f.bank)
       File.mkdir_p!(dir)
@@ -498,18 +514,22 @@ defmodule Orrery.Memory do
     :ok
   end
 
-  def reject_staged(bank, name) do
+  def reject_staged(bank, name), do: locked(fn -> do_reject_staged(bank, name) end)
+
+  defp do_reject_staged(bank, name) do
     read_staging() |> Enum.reject(&(&1.bank == bank and &1.name == name)) |> write_staging()
   end
 
   @doc "Archive (never destroy) a committed memory of a managed bank: moves the file to `_archive/` (recoverable via `restore_memory/2`) and regens the index. Returns `{:error, :not_writable}` for an auto/unsafe bank. Both the dream's archive op and the dashboard delete button route here."
   def delete_memory(bank, file) do
-    if writable?(bank) and Orrery.Store.component?(file) do
-      archive_file(Path.join(memory_root(), bank), file)
-      regen_index(bank)
-    else
-      {:error, :not_writable}
-    end
+    locked(fn ->
+      if writable?(bank) and Orrery.Store.component?(file) do
+        archive_file(Path.join(memory_root(), bank), file)
+        regen_index(bank)
+      else
+        {:error, :not_writable}
+      end
+    end)
   end
 
   # ── distillation via local claude CLI ─────────────────────
@@ -716,15 +736,26 @@ defmodule Orrery.Memory do
   defp judge_and_commit(candidates, bank) do
     case judge(candidates, bank) do
       nil ->
-        # judge unavailable — stage rather than lose the extraction
-        staged =
-          read_staging()
-          |> Enum.reject(fn s ->
-            s.bank == bank and Enum.any?(candidates, &(&1.name == s.name))
-          end)
+        # judge unavailable — stage rather than lose the extraction. If the commit
+        # lock is contended past its budget the candidates aren't persisted, so
+        # surface `:locked` as the result error and let the caller retry.
+        stage = fn ->
+          staged =
+            read_staging()
+            |> Enum.reject(fn s ->
+              s.bank == bank and Enum.any?(candidates, &(&1.name == s.name))
+            end)
 
-        write_staging(staged ++ candidates)
-        %{bank: bank, memories: [], dropped: 0, staged: length(candidates), error: nil}
+          write_staging(staged ++ candidates)
+        end
+
+        case locked(stage) do
+          {:error, :locked} ->
+            %{bank: bank, memories: [], dropped: 0, staged: 0, error: :locked}
+
+          _ ->
+            %{bank: bank, memories: [], dropped: 0, staged: length(candidates), error: nil}
+        end
 
       committed ->
         Enum.each(committed, &commit_memory/1)
@@ -741,34 +772,100 @@ defmodule Orrery.Memory do
 
   @doc """
   Drain the mid-session inbox (`.staging.json`): judge each bank's staged candidates
-  and commit the survivors. Entries whose judge call fails stay staged for the next
-  drain. Returns `%{committed: n, dropped: n, kept: n}`.
+  and commit the survivors. Judge-vetoed entries are ARCHIVED (never destroyed) to the
+  bank's `_archive/`, so a drop stays recoverable via `restore_memory/2`. Entries whose
+  judge call fails (or whose bank is unwritable) stay staged for the next drain.
+
+  Returns `%{committed: n, dropped: n, kept: n, outcomes: [%{bank, name, outcome}]}`,
+  where `outcomes` tags every staged entry seen (`"committed" | "dropped" | "kept"`),
+  accumulated across banks. Each bank's drain also appends a durable audit line to the
+  sweep ledger (`source: "inbox"`, no top-level `id`).
   """
   def drain_inbox do
     read_staging()
     |> Enum.group_by(& &1.bank)
-    |> Enum.reduce(%{committed: 0, dropped: 0, kept: 0}, fn {bank, staged}, acc ->
-      if writable?(bank) do
-        case judge(staged, bank) do
-          nil ->
-            %{acc | kept: acc.kept + length(staged)}
+    |> Enum.reduce(%{committed: 0, dropped: 0, kept: 0, outcomes: []}, fn {bank, staged}, acc ->
+      if writable?(bank), do: drain_bank(bank, staged, acc), else: keep_bank(bank, staged, acc)
+    end)
+  end
 
-          committed ->
-            Enum.each(committed, &commit_memory/1)
-            # judge-dropped entries leave staging — the judge is the reviewer here
-            names = MapSet.new(committed, & &1.name)
-            for s <- staged, not MapSet.member?(names, s.name), do: reject_staged(bank, s.name)
+  defp drain_bank(bank, staged, acc) do
+    case judge(staged, bank) do
+      nil ->
+        keep_bank(bank, staged, acc)
+
+      committed ->
+        # Commit the survivors and archive the judge-vetoed entries in one held lock
+        # (the judge is the reviewer here; dropped => archived, recoverable). On lock
+        # exhaustion, skip this bank and count it kept — the next drain retries.
+        names = MapSet.new(committed, & &1.name)
+        dropped = Enum.reject(staged, &MapSet.member?(names, &1.name))
+
+        mutate = fn ->
+          Enum.each(committed, &do_commit_memory/1)
+          archive_staged(bank, dropped)
+        end
+
+        case locked(mutate) do
+          {:error, :locked} ->
+            keep_bank(bank, staged, acc)
+
+          _ ->
+            record_inbox(bank, length(committed), length(dropped), Enum.map(dropped, & &1.name))
+
+            outcomes =
+              Enum.map(staged, fn s ->
+                %{
+                  bank: bank,
+                  name: s.name,
+                  outcome: if(MapSet.member?(names, s.name), do: "committed", else: "dropped")
+                }
+              end)
 
             %{
               acc
               | committed: acc.committed + length(committed),
-                dropped: acc.dropped + (length(staged) - length(committed))
+                dropped: acc.dropped + length(dropped),
+                outcomes: acc.outcomes ++ outcomes
             }
         end
-      else
-        %{acc | kept: acc.kept + length(staged)}
-      end
-    end)
+    end
+  end
+
+  defp keep_bank(bank, staged, acc) do
+    outcomes = Enum.map(staged, &%{bank: bank, name: &1.name, outcome: "kept"})
+    %{acc | kept: acc.kept + length(staged), outcomes: acc.outcomes ++ outcomes}
+  end
+
+  # Judge-vetoed staged entries are archived, not destroyed: serialize each (created =
+  # updated = now, like commit_memory) into the bank's `_archive/` under a canonical
+  # `<stamp>_<type>_<slug>.md` name (the stamp matches archive_file's format, so the
+  # prefix alone prevents archive collisions — no live-dir check needed), then remove it
+  # from staging. Called by drain_bank inside the already-held commit lock.
+  defp archive_staged(bank, staged) do
+    archive = Path.join([memory_root(), bank, "_archive"])
+    File.mkdir_p!(archive)
+    now = DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601()
+    stamp = DateTime.utc_now() |> Calendar.strftime("%Y%m%dT%H%M%S")
+
+    for s <- staged do
+      f = s |> Map.put(:created, now) |> Map.put(:updated, now)
+      Orrery.Store.write!(Path.join(archive, "#{stamp}_#{file_name(f)}"), serialize_memory(f))
+      do_reject_staged(bank, s.name)
+    end
+  end
+
+  # Durable audit of one bank's inbox drain. No top-level `id` — the sweep ledger keys
+  # session outcomes by id, and an inbox line must never be mistaken for one.
+  defp record_inbox(bank, committed, dropped, dropped_names) do
+    Orrery.Memory.Sweep.record(%{
+      bank: bank,
+      committed: committed,
+      dropped: dropped,
+      dropped_names: dropped_names,
+      outcome: "inbox",
+      source: "inbox"
+    })
   end
 
   @doc """
@@ -849,29 +946,31 @@ defmodule Orrery.Memory do
   live again, so nothing is destroyed.
   """
   def restore_memory(bank, file) do
-    src = Path.join([memory_root(), bank, "_archive", file])
+    locked(fn ->
+      src = Path.join([memory_root(), bank, "_archive", file])
 
-    with true <- writable?(bank) and Orrery.Store.component?(file),
-         {:ok, raw} <- File.read(src) do
-      m = parse_memory(raw, file, bank)
+      with true <- writable?(bank) and Orrery.Store.component?(file),
+           {:ok, raw} <- File.read(src) do
+        m = parse_memory(raw, file, bank)
 
-      :ok =
-        commit_memory(%{
-          bank: bank,
-          body: m.body,
-          created: m.created,
-          description: m.description,
-          name: m.name,
-          replaces: nil,
-          source: m.source,
-          type: m.type
-        })
+        :ok =
+          do_commit_memory(%{
+            bank: bank,
+            body: m.body,
+            created: m.created,
+            description: m.description,
+            name: m.name,
+            replaces: nil,
+            source: m.source,
+            type: m.type
+          })
 
-      File.rm(src)
-      :ok
-    else
-      _ -> {:error, :not_found}
-    end
+        File.rm(src)
+        :ok
+      else
+        _ -> {:error, :not_found}
+      end
+    end)
   end
 
   @doc "Committed memories of one managed bank (full bodies), for the dream pass."

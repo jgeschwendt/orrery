@@ -51,16 +51,9 @@ defmodule Orrery.Memory.Sweep do
   two concurrent queue rewrites could resurrect a consumed entry.
   """
   def run(opts \\ []) do
-    case acquire_lock() do
-      :ok ->
-        try do
-          do_run(opts)
-        after
-          release_lock()
-        end
-
-      :locked ->
-        :locked
+    case Memory.Locks.with_lock(:pipeline, fn -> do_run(opts) end) do
+      {:ok, report} -> report
+      {:error, :locked} -> :locked
     end
   end
 
@@ -74,33 +67,6 @@ defmodule Orrery.Memory.Sweep do
       "inbox #{inbox.committed}✓/#{inbox.dropped}✗/#{inbox.kept}… · " <>
       "#{length(report.dreamt)} bank(s) dreamt"
   end
-
-  defp lock_path, do: Path.join(Memory.memory_root(), ".sweep.lock")
-
-  defp acquire_lock do
-    File.mkdir_p!(Memory.memory_root())
-
-    case File.mkdir(lock_path()) do
-      :ok -> :ok
-      {:error, :eexist} -> steal_stale_lock()
-      _ -> :locked
-    end
-  end
-
-  # A sweep is bounded by its claude calls — a lock older than 2h belongs to a
-  # crashed run and would otherwise block every future sweep.
-  defp steal_stale_lock do
-    with {:ok, %{mtime: mtime}} <- File.stat(lock_path(), time: :posix),
-         true <- System.os_time(:second) - mtime > 2 * 3600,
-         _ <- File.rmdir(lock_path()),
-         :ok <- File.mkdir(lock_path()) do
-      :ok
-    else
-      _ -> :locked
-    end
-  end
-
-  defp release_lock, do: File.rmdir(lock_path())
 
   defp do_run(opts) do
     max = opts[:max] || @max_default
@@ -284,7 +250,8 @@ defmodule Orrery.Memory.Sweep do
 
   # ── ledger ────────────────────────────────────────────────
   # Append-only JSONL; the newest line per {project, id} wins on read.
-  defp record(entry) do
+  @doc "Append one entry to the append-only sweep ledger (stamps `:at`). Public so the inbox drain can record its own audit lines."
+  def record(entry) do
     File.mkdir_p!(Memory.memory_root())
 
     line =

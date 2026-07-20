@@ -32,13 +32,25 @@ defmodule Orrery.Claude do
   `{:error, reason}`.
   """
   def run(prompt, opts \\ []) do
-    tmp = Path.join(System.tmp_dir!(), "claude_run_#{System.unique_integer([:positive])}.txt")
-    File.write!(tmp, prompt)
+    # `:claude_runner` is the test seam: a 2-arity fun or a module with `run/2`
+    # stands in for the real CLI so pipeline/judge tests never spend a claude call.
+    # Unset (the production default) runs the real `System.cmd` path unchanged.
+    case Application.get_env(:orrery, :claude_runner) do
+      nil ->
+        tmp = Path.join(System.tmp_dir!(), "claude_run_#{System.unique_integer([:positive])}.txt")
+        File.write!(tmp, prompt)
 
-    try do
-      do_run(tmp, opts)
-    after
-      File.rm(tmp)
+        try do
+          do_run(tmp, opts)
+        after
+          File.rm(tmp)
+        end
+
+      fun when is_function(fun, 2) ->
+        fun.(prompt, opts)
+
+      mod when is_atom(mod) ->
+        mod.run(prompt, opts)
     end
   end
 

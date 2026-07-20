@@ -294,6 +294,101 @@ defmodule Orrery.MemoryTest do
     assert %{committed: 0, dropped: 0, kept: 1} = Memory.drain_inbox()
   end
 
+  defp stage!(root, entries) do
+    File.write!(Path.join(root, ".staging.json"), Jason.encode!(entries))
+  end
+
+  defp staged_entry(attrs) do
+    Map.merge(
+      %{
+        bank: @bank,
+        body: "b",
+        description: "d",
+        name: "n",
+        recall: nil,
+        replaces: nil,
+        source: nil,
+        type: "reference"
+      },
+      attrs
+    )
+  end
+
+  defp stub_judge(fun) do
+    Application.put_env(:orrery, :claude_runner, fun)
+    on_exit(fn -> Application.delete_env(:orrery, :claude_runner) end)
+  end
+
+  test "drain_inbox archives judge-dropped entries instead of destroying them", %{root: root} do
+    stub_judge(fn _prompt, _opts ->
+      {:ok, %{output: %{"verdicts" => [%{"name" => "Droppable fact", "verdict" => "drop"}]}, cost: 0.0}}
+    end)
+
+    stage!(root, [staged_entry(%{body: "drop me body", name: "Droppable fact", type: "feedback"})])
+
+    result = Memory.drain_inbox()
+    assert result.committed == 0
+    assert result.dropped == 1
+    assert Memory.read_staging() == []
+
+    archive_dir = Path.join([root, @bank, "_archive"])
+    assert [file] = File.ls!(archive_dir)
+    assert file =~ ~r/^\d{8}T\d{6}_feedback_droppable_fact\.md$/
+
+    assert [a] = Memory.archived_memories(@bank)
+    assert a.name == "Droppable fact"
+    assert a.type == "feedback"
+    assert a.body == "drop me body"
+  end
+
+  test "drain_inbox outcomes tag committed and dropped entries", %{root: root} do
+    stub_judge(fn _prompt, _opts ->
+      {:ok,
+       %{
+         output: %{
+           "verdicts" => [
+             %{"name" => "Keeper", "verdict" => "commit", "replaces" => []},
+             %{"name" => "Loser", "verdict" => "drop"}
+           ]
+         },
+         cost: 0.0
+       }}
+    end)
+
+    stage!(root, [staged_entry(%{name: "Keeper"}), staged_entry(%{name: "Loser"})])
+
+    result = Memory.drain_inbox()
+    assert result.committed == 1
+    assert result.dropped == 1
+
+    assert Enum.sort_by(result.outcomes, & &1.name) == [
+             %{bank: @bank, name: "Keeper", outcome: "committed"},
+             %{bank: @bank, name: "Loser", outcome: "dropped"}
+           ]
+
+    assert [committed] = Memory.bank_memories(@bank)
+    assert committed.name == "Keeper"
+  end
+
+  test "drain_inbox keeps and tags entries when the judge is unavailable", %{root: root} do
+    stub_judge(fn _prompt, _opts -> {:error, :boom} end)
+
+    stage!(root, [staged_entry(%{name: "Kept one"}), staged_entry(%{name: "Kept two"})])
+
+    result = Memory.drain_inbox()
+    assert result == %{
+             committed: 0,
+             dropped: 0,
+             kept: 2,
+             outcomes: [
+               %{bank: @bank, name: "Kept one", outcome: "kept"},
+               %{bank: @bank, name: "Kept two", outcome: "kept"}
+             ]
+           }
+
+    assert length(Memory.read_staging()) == 2
+  end
+
   test "punctuation-only names fall back to distinct x<digest> slugs", %{root: root} do
     :ok = commit(%{name: "!!!"})
     :ok = commit(%{name: "@@@"})

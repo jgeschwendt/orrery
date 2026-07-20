@@ -164,6 +164,34 @@ defmodule Orrery.Memory.SweepTest do
     assert [%{"outcome" => "lost", "id" => "gone"}] = Sweep.recent()
   end
 
+  test "a drain pass writes an inbox ledger line and populates report.inbox.outcomes",
+       %{memory: memory} do
+    Application.put_env(:orrery, :claude_runner, fn _prompt, _opts ->
+      {:ok, %{output: %{"verdicts" => [%{"name" => "Inbox fact", "verdict" => "drop"}]}, cost: 0.0}}
+    end)
+
+    on_exit(fn -> Application.delete_env(:orrery, :claude_runner) end)
+
+    staging = [
+      %{
+        "bank" => "-tmp-proj",
+        "body" => "b",
+        "description" => "d",
+        "name" => "Inbox fact",
+        "type" => "reference"
+      }
+    ]
+
+    File.write!(Path.join(memory, ".staging.json"), Jason.encode!(staging))
+
+    report = Sweep.run()
+
+    assert report.inbox.dropped == 1
+    assert [%{bank: "-tmp-proj", name: "Inbox fact", outcome: "dropped"}] = report.inbox.outcomes
+
+    assert Enum.any?(Sweep.recent(), &(&1["source"] == "inbox" and &1["outcome"] == "inbox"))
+  end
+
   test "queue entries count against the shared dissolve cap", %{
     log: log,
     projects: projects
