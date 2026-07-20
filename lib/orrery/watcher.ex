@@ -8,6 +8,9 @@ defmodule Orrery.Watcher do
     * `"transcripts"` → `{:session_changed, project, id}`
     * `"memory"`      → `:memory_changed`
     * `"log"`         → `:log_changed`
+    * `"pipeline"`    → `{:pipeline, :files_changed}` (a `.jsonl` write directly under
+      `memory_root()` — the dissolve queue or sweep ledger — kicks the Pipeline worker so
+      shell `/dissolve` appends are picked up promptly)
   """
   use GenServer
 
@@ -50,6 +53,9 @@ defmodule Orrery.Watcher do
 
       :log_changed ->
         Phoenix.PubSub.broadcast(Orrery.PubSub, "log", :log_changed)
+
+      {:pipeline, :files_changed} = msg ->
+        Phoenix.PubSub.broadcast(Orrery.PubSub, "pipeline", msg)
     end)
 
     {:noreply, %{state | pending: MapSet.new(), timer: nil}}
@@ -73,6 +79,12 @@ defmodule Orrery.Watcher do
 
       String.ends_with?(path, ".md") and String.starts_with?(path, Memory.memory_root()) ->
         :memory_changed
+
+      # A `.jsonl` written *directly* under memory_root — the dissolve queue or sweep
+      # ledger — kicks the Pipeline. Bank subdirectory files sit one level deeper and are
+      # excluded by the dirname check.
+      String.ends_with?(path, ".jsonl") and Path.dirname(path) == Memory.memory_root() ->
+        {:pipeline, :files_changed}
 
       true ->
         nil

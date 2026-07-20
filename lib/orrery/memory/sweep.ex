@@ -13,7 +13,10 @@ defmodule Orrery.Memory.Sweep do
     * **Ledger** (`@memory/.sweep.jsonl`, append-only) — one line per handled session;
       makes re-runs no-ops and gives the dashboard provenance. A `dissolved`/`staged`
       outcome is permanent (the transcript is consumed); `trivial` re-arms when the
-      session gains new messages; `error` retries next sweep.
+      session gains new messages; `error` retries next sweep. Custody of the ledger
+      (`Runner.record/1`, `Runner.ledger/0`) and the append-only dissolve queue now
+      lives in `Orrery.Memory.Pipeline.Runner`; the sweep is one caller among two (the
+      other is the in-app `Pipeline` worker).
     * **Trivial guard** — sessions with fewer than `@min_messages` renderable messages
       are ledgered without spending a claude call; their transcripts are left alone.
     * **Caps** — at most `max` (default 3) dissolves per run, so a backlog or a
@@ -31,15 +34,17 @@ defmodule Orrery.Memory.Sweep do
   """
 
   alias Orrery.{Memory, Transcripts}
+  alias Orrery.Memory.Pipeline.Runner
 
   @idle_hours 48
   @max_default 3
   @min_messages 4
-  # an enqueued session whose archive never appears is unrecoverable after this long
-  @queue_lost_hours 24
 
-  def ledger_path, do: Path.join(Memory.memory_root(), ".sweep.jsonl")
-  def queue_path, do: Path.join(Memory.memory_root(), ".dissolve-queue.jsonl")
+  defdelegate ledger_path, to: Runner
+  defdelegate queue_path, to: Runner
+
+  @doc "Append one entry to the append-only sweep ledger (stamps `:at`). Public so the inbox drain can record its own audit lines. Delegates to `Runner.record/1`, the ledger's single writer."
+  defdelegate record(entry), to: Runner
 
   defp archive_on_exit_dir, do: Path.join(System.user_home!(), ".claude/@log/.archive-on-exit")
 
@@ -48,7 +53,7 @@ defmodule Orrery.Memory.Sweep do
   idle sessions (queue entries count against `max`), run due dreams. Returns
   a report map (also printed by the mix task), or `:locked` when another sweep is
   already running — the launchd run and the dashboard's "Sweep now" may overlap, and
-  two concurrent queue rewrites could resurrect a consumed entry.
+  two concurrent extractions could double-process a queue entry.
   """
   def run(opts \\ []) do
     case Memory.Locks.with_lock(:pipeline, fn -> do_run(opts) end) do
@@ -71,7 +76,7 @@ defmodule Orrery.Memory.Sweep do
   defp do_run(opts) do
     max = opts[:max] || @max_default
     now = DateTime.utc_now()
-    ledger = read_ledger()
+    ledger = Runner.ledger()
 
     {queue_results, queue_used} = consume_queue(max, now)
 
@@ -100,103 +105,22 @@ defmodule Orrery.Memory.Sweep do
   end
 
   # ── dissolve queue ────────────────────────────────────────
-  @doc "Pending dissolve-queue entries, oldest first (for the dashboard)."
-  def queued do
-    case File.read(queue_path()) do
-      {:ok, txt} ->
-        txt
-        |> String.split("\n", trim: true)
-        |> Enum.flat_map(fn line ->
-          case Jason.decode(line) do
-            {:ok, %{"id" => id} = e} when is_binary(id) -> [e]
-            _ -> []
-          end
-        end)
+  @doc "Pending dissolve-queue entries, oldest first (for the dashboard). Derived from the append-only queue minus permanently-ledgered ids — see `Runner.pending/1`."
+  def queued, do: Runner.pending(DateTime.utc_now())
 
-      _ ->
-        []
-    end
-  end
-
-  # Serve up to `max` entries; an entry survives the rewrite only while retrying
-  # (extraction error, or archive not yet flushed). Everything else — dissolved,
-  # staged, trivial, lost — is consumed.
+  # Serve up to `max` derived-pending entries. The queue is append-only: a consumed
+  # entry drops out of `pending` because its permanent outcome lands in the ledger —
+  # nothing here rewrites the queue file. `error`/`waiting` stay pending (error
+  # ledgers non-permanently and retries; waiting never ledgers at all).
   defp consume_queue(max, now) do
-    entries = queued()
-    {take, defer} = Enum.split(entries, max)
-    results = Enum.map(take, &consume_entry(&1, now))
-
-    keep = for {e, r} <- Enum.zip(take, results), r.outcome in ["error", "waiting"], do: e
-
-    if entries != [], do: write_queue(keep ++ defer)
+    take = Runner.pending(now) |> Enum.take(max)
+    results = Enum.map(take, &Runner.process_entry(&1, now))
     {results, length(take)}
   end
 
-  defp consume_entry(%{"id" => id} = e, now) do
-    session = Transcripts.parse_archived(id)
-    cwd = (session && session.cwd) || e["cwd"]
-
-    cond do
-      is_nil(session) and queue_age_hours(e, now) >= @queue_lost_hours ->
-        finish(e, %{outcome: "lost"})
-
-      is_nil(session) ->
-        # the /delete finalize may not have flushed the archive yet — retry next run
-        %{id: id, title: e["title"], outcome: "waiting", memories: 0}
-
-      not is_binary(cwd) ->
-        finish(e, %{outcome: "lost", error: "no cwd in transcript or queue entry"})
-
-      session.message_count < @min_messages ->
-        finish(e, %{outcome: "trivial"})
-
-      true ->
-        result = Memory.distill(%{session | cwd: cwd}, id)
-        outcome = outcome_of(result)
-
-        finish(e, %{
-          outcome: outcome,
-          bank: result.bank,
-          memories: Enum.map(result.memories, & &1.name),
-          dropped: result.dropped,
-          staged: result.staged,
-          error: result.error && inspect(result.error)
-        })
-    end
-  end
-
-  defp finish(e, extra) do
-    entry =
-      Map.merge(
-        %{source: "queue", id: e["id"], title: e["title"], queued_at: e["queued_at"]},
-        extra
-      )
-
-    record(entry)
-
-    %{
-      id: e["id"],
-      title: e["title"],
-      outcome: entry.outcome,
-      memories: length(entry[:memories] || [])
-    }
-  end
-
-  defp queue_age_hours(e, now) do
-    case DateTime.from_iso8601(e["queued_at"] || "") do
-      {:ok, dt, _} -> DateTime.diff(now, dt, :hour)
-      # unstampable entries can never prove their age — treat as old enough to lose
-      _ -> @queue_lost_hours
-    end
-  end
-
-  defp write_queue(entries),
-    do:
-      Orrery.Store.write!(queue_path(), Enum.map_join(entries, "", &(Jason.encode!(&1) <> "\n")))
-
   defp sweepable?(session, ledger, now) do
     quiescent?(session, now) and not marked_archive_on_exit?(session.id) and
-      case ledger[{session.project, session.id}] do
+      case ledger[session.id] do
         nil -> true
         # a "trivial" verdict re-arms when the session has since gained messages
         %{"outcome" => "trivial"} = e -> e["updated_at"] != session.updated_at
@@ -217,18 +141,9 @@ defmodule Orrery.Memory.Sweep do
   @doc "True when a live transcript is pre-marked archive-on-exit — the session-end machinery owns it; neither the sweep nor a dashboard dissolve may consume it."
   def marked_archive_on_exit?(id), do: File.exists?(Path.join(archive_on_exit_dir(), id))
 
-  # Consume the transcript on any successful extraction — including `staged` (the
-  # candidates are safely in the inbox awaiting the next judge) and a clean zero
-  # (nothing durable in the conversation). Only an extraction *error* leaves the
-  # transcript for retry.
-  # error > staged > dissolved: the permanence ladder for a distill result
-  defp outcome_of(%{error: e}) when not is_nil(e), do: "error"
-  defp outcome_of(%{staged: s}) when s > 0, do: "staged"
-  defp outcome_of(_), do: "dissolved"
-
   defp dissolve(session) do
     result = Memory.distill_session(session.project, session.id)
-    outcome = outcome_of(result)
+    outcome = Runner.outcome_of(result)
 
     if outcome != "error", do: Transcripts.delete_session(session.project, session.id)
 
@@ -248,37 +163,7 @@ defmodule Orrery.Memory.Sweep do
     %{id: session.id, title: session.title, outcome: outcome, memories: length(result.memories)}
   end
 
-  # ── ledger ────────────────────────────────────────────────
-  # Append-only JSONL; the newest line per {project, id} wins on read.
-  @doc "Append one entry to the append-only sweep ledger (stamps `:at`). Public so the inbox drain can record its own audit lines."
-  def record(entry) do
-    File.mkdir_p!(Memory.memory_root())
-
-    line =
-      entry
-      |> Map.put(:at, DateTime.utc_now() |> DateTime.truncate(:second) |> DateTime.to_iso8601())
-      |> Jason.encode!()
-
-    File.write!(ledger_path(), line <> "\n", [:append])
-  end
-
-  defp read_ledger do
-    case File.read(ledger_path()) do
-      {:ok, txt} ->
-        txt
-        |> String.split("\n", trim: true)
-        |> Enum.reduce(%{}, fn line, acc ->
-          case Jason.decode(line) do
-            {:ok, %{"project" => p, "id" => id} = e} -> Map.put(acc, {p, id}, e)
-            _ -> acc
-          end
-        end)
-
-      _ ->
-        %{}
-    end
-  end
-
+  # ── ledger (read for the dashboard) ───────────────────────
   @doc "Newest-first ledger entries for the dashboard, capped at `n`."
   def recent(n \\ 30) do
     case File.read(ledger_path()) do

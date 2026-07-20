@@ -687,8 +687,14 @@ defmodule Orrery.Memory do
   Distill an already-parsed session map — the shared core of `distill_session/2` and
   the dissolve-queue consumer (which parses from the @log archive instead of a live
   transcript). Same result contract as `distill_session/2`.
+
+  `:progress` is a 1-arity callback the pipeline worker uses to broadcast stage
+  transitions — invoked with `:extracting` before the extract claude call and
+  `:judging` before the judge pass (only when there are candidates to judge).
+  Defaults to a no-op, so `distill/2` and the sweep get the old behavior unchanged.
   """
-  def distill(session, id) do
+  def distill(session, id, opts \\ []) do
+    progress = Keyword.get(opts, :progress, fn _ -> :ok end)
     bank = sanitize(session.cwd)
 
     prompt = """
@@ -705,6 +711,8 @@ defmodule Orrery.Memory do
     #{flatten(session)}
     """
 
+    progress.(:extracting)
+
     case Orrery.Claude.run(prompt, schema: @extract_schema) do
       {:error, reason} ->
         %{bank: bank, memories: [], dropped: 0, staged: 0, error: reason}
@@ -713,7 +721,7 @@ defmodule Orrery.Memory do
         candidates =
           raw |> Enum.map(&sanitize_memory(&1, bank, id, nil)) |> Enum.reject(&is_nil/1)
 
-        judge_and_commit(candidates, bank)
+        judge_and_commit(candidates, bank, progress)
     end
   end
 
@@ -730,10 +738,12 @@ defmodule Orrery.Memory do
     end
   end
 
-  defp judge_and_commit([], bank),
+  defp judge_and_commit([], bank, _progress),
     do: %{bank: bank, memories: [], dropped: 0, staged: 0, error: nil}
 
-  defp judge_and_commit(candidates, bank) do
+  defp judge_and_commit(candidates, bank, progress) do
+    progress.(:judging)
+
     case judge(candidates, bank) do
       nil ->
         # judge unavailable — stage rather than lose the extraction. If the commit

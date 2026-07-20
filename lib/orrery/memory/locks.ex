@@ -91,6 +91,14 @@ defmodule Orrery.Memory.Locks do
   @doc "Releases a pipeline lock taken with `try_pipeline_lock/0`."
   def release_pipeline_lock, do: release(:pipeline)
 
+  @doc """
+  Drags the pipeline lock's mtime forward — a manual heartbeat for a holder that took
+  the lock via `try_pipeline_lock/0` (which, unlike `with_lock/2`, spawns no automatic
+  heartbeat). The `Pipeline` worker calls this on its own timer while holding the lock
+  across a queue batch, so a slow-but-alive batch is never mistaken for a dead holder.
+  """
+  def heartbeat_pipeline, do: File.touch(path(:pipeline))
+
   # ── acquire / steal ───────────────────────────────────────
   defp acquire(kind) do
     File.mkdir_p!(Orrery.Memory.memory_root())

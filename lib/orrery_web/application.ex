@@ -9,6 +9,8 @@ defmodule OrreryWeb.Application do
       OrreryWeb.Telemetry,
       {Phoenix.PubSub, name: Orrery.PubSub},
       Orrery.Watcher,
+      {Task.Supervisor, name: Orrery.Memory.Pipeline.TaskSup},
+      Orrery.Memory.Pipeline,
       OrreryWeb.Endpoint
     ]
 
