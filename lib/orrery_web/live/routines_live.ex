@@ -178,8 +178,8 @@ defmodule OrreryWeb.RoutinesLive do
         <% end %>
       </div>
 
-      <div :if={@modal} class="modal-bg" phx-click="close_modal">
-        <div class="modal wide-modal" onclick="event.stopPropagation()">
+      <div :if={@modal} class="modal-bg">
+        <div class="modal wide-modal" phx-click-away="close_modal">
           <h3>{if @modal.mode == :new, do: "New routine", else: "Edit routine"}</h3>
           <p class="hint">
             launchd runs this on the schedule below, unattended — claude gets <code>--permission-mode=auto</code>.

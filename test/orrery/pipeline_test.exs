@@ -27,7 +27,9 @@ defmodule Orrery.Memory.PipelineTest do
       File.rm_rf!(base)
     end)
 
-    # A fresh, isolated worker per test (the app-started singleton stays dormant).
+    # A fresh, isolated Task.Supervisor + worker per test (the app starts neither in :test).
+    # The worker runs its entry tasks under the globally-named TaskSup, so it must exist.
+    start_supervised!({Task.Supervisor, name: Orrery.Memory.Pipeline.TaskSup})
     pid = start_supervised!({Pipeline, name: :test_pipeline})
     %{log: log, pid: pid}
   end

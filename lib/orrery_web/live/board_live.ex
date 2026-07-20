@@ -256,7 +256,7 @@ defmodule OrreryWeb.BoardLive do
     socket =
       if updated && not MapSet.member?(pending, id) &&
            match_q?(updated, String.downcase(socket.assigns.q)) do
-        stream_insert(socket, :live, Map.delete(updated, :messages))
+        stream_insert(socket, :live, Map.delete(updated, :messages), at: 0)
       else
         stream_delete_by_dom_id(socket, :live, "live-#{p}-#{id}")
       end

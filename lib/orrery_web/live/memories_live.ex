@@ -321,8 +321,8 @@ defmodule OrreryWeb.MemoriesLive do
         </div>
       </div>
 
-      <div :if={@dream} class="modal-bg" phx-click="close_dream">
-        <div class="modal" phx-click-away="close_dream" onclick="event.stopPropagation()">
+      <div :if={@dream} class="modal-bg">
+        <div class="modal" phx-click-away="close_dream">
           <h3>Dream instructions</h3>
           <p class="hint">
             Guides every dissolve. The whole conversation is always fed — these tune what's kept.

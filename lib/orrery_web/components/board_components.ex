@@ -75,7 +75,7 @@ defmodule OrreryWeb.BoardComponents do
         <span>{@reason}</span>
       </div>
 
-      <div :if={@variant == :live} class="card-actions" onclick="event.stopPropagation()">
+      <div :if={@variant == :live} class="card-actions">
         <button
           class="btn"
           phx-click="dissolve"
@@ -93,7 +93,7 @@ defmodule OrreryWeb.BoardComponents do
         ><.ph name="trash" /></button>
       </div>
 
-      <div :if={@reason} class="card-actions" onclick="event.stopPropagation()">
+      <div :if={@reason} class="card-actions">
         <button class="btn" phx-click="retry" phx-value-id={@sid}>
           <.ph name="arrow-clockwise" /> retry
         </button>
@@ -206,7 +206,7 @@ defmodule OrreryWeb.BoardComponents do
 
   def drawer(assigns) do
     ~H"""
-    <div class="drawer-bg" phx-click="close_drawer">
+    <div class="drawer-bg">
       <div
         class="drawer"
         role="dialog"
@@ -215,7 +215,6 @@ defmodule OrreryWeb.BoardComponents do
         tabindex="-1"
         phx-mounted={JS.focus()}
         phx-click-away="close_drawer"
-        onclick="event.stopPropagation()"
       >
         {render_slot(@inner_block)}
       </div>

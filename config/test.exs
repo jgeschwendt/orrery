@@ -1,5 +1,11 @@
 import Config
 
+# Keep the globally-named background singletons (Watcher, pipeline Task.Supervisor, and
+# the Pipeline worker) out of the supervision tree in test — a shared singleton's async
+# work would race each test's per-test `memory_root` override and could write into the
+# real ~/.claude ledger. Tests start their own isolated instances via `start_supervised!`.
+config :orrery, start_pipeline?: false
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :orrery, OrreryWeb.Endpoint,

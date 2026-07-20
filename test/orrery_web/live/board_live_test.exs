@@ -24,13 +24,6 @@ defmodule OrreryWeb.BoardLiveTest do
     Application.put_env(:orrery, :projects_dir, projects)
     Application.put_env(:orrery, :log_root, log)
 
-    # The app-started singleton worker is shared across tests; hand it back to idle so a
-    # prior test's in-flight state can't leak a stray PROCESSING card into this one.
-    :sys.replace_state(
-      Pipeline,
-      &%{&1 | job: :idle, in_flight: nil, queue_batch: [], task_ref: nil}
-    )
-
     # A guard: the trivial sessions below never reach a claude call, but stub the seam so
     # nothing can ever shell out to the real CLI during a test.
     Application.put_env(:orrery, :claude_runner, fn _prompt, _opts ->
@@ -44,6 +37,14 @@ defmodule OrreryWeb.BoardLiveTest do
       Application.delete_env(:orrery, :claude_runner)
       File.rm_rf!(base)
     end)
+
+    # A fresh, isolated Task.Supervisor + worker under the app's default names (the app
+    # starts neither in :test). Registered AFTER the env `on_exit` so ExUnit tears them
+    # down FIRST (LIFO): an in-flight dissolve task is killed before `memory_root` reverts,
+    # so a trivial-session write can never land in the real ~/.claude ledger. The LiveView
+    # dissolves through the default-named Pipeline.
+    start_supervised!({Task.Supervisor, name: Orrery.Memory.Pipeline.TaskSup})
+    start_supervised!(Pipeline)
 
     %{}
   end
@@ -163,5 +164,23 @@ defmodule OrreryWeb.BoardLiveTest do
     assert has_element?(view, "div[role='dialog']")
     assert has_element?(view, ".drawer .thread")
     assert render(view) =~ "drawer probe text"
+  end
+
+  test "a session_changed broadcast inserts a new live card, then removes it, without remount",
+       %{conn: conn} do
+    {:ok, view, _html} = live(conn, ~p"/")
+    refute has_element?(view, "#live-#{@project}-sess-e")
+
+    # A new on-disk session announced over PubSub streams into LIVE without a remount.
+    write_session("sess-e", ["fresh session", "second turn"])
+    Phoenix.PubSub.broadcast(Orrery.PubSub, "transcripts", {:session_changed, @project, "sess-e"})
+    _ = render(view)
+    assert has_element?(view, "#live-#{@project}-sess-e")
+
+    # Its removal from disk, announced the same way, drops the card.
+    File.rm!(Path.join([Application.get_env(:orrery, :projects_dir), @project, "sess-e.jsonl"]))
+    Phoenix.PubSub.broadcast(Orrery.PubSub, "transcripts", {:session_changed, @project, "sess-e"})
+    _ = render(view)
+    refute has_element?(view, "#live-#{@project}-sess-e")
   end
 end

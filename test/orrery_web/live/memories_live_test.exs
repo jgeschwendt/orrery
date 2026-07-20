@@ -29,6 +29,12 @@ defmodule OrreryWeb.MemoriesLiveTest do
       File.rm_rf!(base)
     end)
 
+    # The app starts no Pipeline in :test; these tests drive it via `Pipeline.status/0` and
+    # `:sys.replace_state/2` (`with_busy_pipeline`), so start an isolated one under the
+    # default name (torn down per test). No dissolve task runs — `request_*` fire only while
+    # busy, so they short-circuit with `{:error, :busy}` before any Task is spawned.
+    start_supervised!(Pipeline)
+
     %{memory: memory}
   end
 
