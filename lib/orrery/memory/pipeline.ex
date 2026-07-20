@@ -72,7 +72,8 @@ defmodule Orrery.Memory.Pipeline do
   def request_sweep(server \\ __MODULE__), do: GenServer.call(server, :request_sweep)
 
   @doc "Run the dream over `bank` off the caller. `{:error, :busy}` unless idle."
-  def request_dream(bank, server \\ __MODULE__), do: GenServer.call(server, {:request_dream, bank})
+  def request_dream(bank, server \\ __MODULE__),
+    do: GenServer.call(server, {:request_dream, bank})
 
   @doc "Merge `files` in `bank` off the caller. `{:error, :busy}` unless idle."
   def request_merge(bank, files, server \\ __MODULE__),
@@ -143,7 +144,10 @@ defmodule Orrery.Memory.Pipeline do
 
   def handle_call({:request_merge, bank, files}, _from, %{job: :idle} = state) do
     broadcast({:pipeline, :job, {:started, :merge, bank}})
-    task = run_task(fn -> Locks.with_lock(:pipeline, fn -> Memory.merge_memories(bank, files) end) end)
+
+    task =
+      run_task(fn -> Locks.with_lock(:pipeline, fn -> Memory.merge_memories(bank, files) end) end)
+
     {:reply, :ok, %{state | job: :merge, task_ref: task.ref}}
   end
 

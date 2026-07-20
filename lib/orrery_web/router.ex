@@ -13,7 +13,7 @@ defmodule OrreryWeb.Router do
   scope "/", OrreryWeb do
     pipe_through :browser
 
-    live "/", ConversationsLive
+    live "/", BoardLive
     live "/log", UserLogLive
     live "/memories", MemoriesLive
     live "/routines", RoutinesLive

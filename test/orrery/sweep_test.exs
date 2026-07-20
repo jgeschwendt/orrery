@@ -167,7 +167,8 @@ defmodule Orrery.Memory.SweepTest do
   test "a drain pass writes an inbox ledger line and populates report.inbox.outcomes",
        %{memory: memory} do
     Application.put_env(:orrery, :claude_runner, fn _prompt, _opts ->
-      {:ok, %{output: %{"verdicts" => [%{"name" => "Inbox fact", "verdict" => "drop"}]}, cost: 0.0}}
+      {:ok,
+       %{output: %{"verdicts" => [%{"name" => "Inbox fact", "verdict" => "drop"}]}, cost: 0.0}}
     end)
 
     on_exit(fn -> Application.delete_env(:orrery, :claude_runner) end)

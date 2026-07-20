@@ -321,7 +321,8 @@ defmodule Orrery.MemoryTest do
 
   test "drain_inbox archives judge-dropped entries instead of destroying them", %{root: root} do
     stub_judge(fn _prompt, _opts ->
-      {:ok, %{output: %{"verdicts" => [%{"name" => "Droppable fact", "verdict" => "drop"}]}, cost: 0.0}}
+      {:ok,
+       %{output: %{"verdicts" => [%{"name" => "Droppable fact", "verdict" => "drop"}]}, cost: 0.0}}
     end)
 
     stage!(root, [staged_entry(%{body: "drop me body", name: "Droppable fact", type: "feedback"})])
@@ -376,6 +377,7 @@ defmodule Orrery.MemoryTest do
     stage!(root, [staged_entry(%{name: "Kept one"}), staged_entry(%{name: "Kept two"})])
 
     result = Memory.drain_inbox()
+
     assert result == %{
              committed: 0,
              dropped: 0,

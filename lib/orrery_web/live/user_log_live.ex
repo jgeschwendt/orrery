@@ -1,6 +1,7 @@
 defmodule OrreryWeb.UserLogLive do
   use OrreryWeb, :live_view
   import OrreryWeb.UI
+  alias Orrery.Memory.Pipeline
   alias Orrery.UserLog
 
   @months ~w(January February March April May June July August September October November December)
@@ -73,8 +74,18 @@ defmodule OrreryWeb.UserLogLive do
     {:noreply, socket |> assign(busy: "Notes saved.") |> load()}
   end
 
-  def handle_event("dissolve", %{"project" => p, "id" => id}, socket),
-    do: {:noreply, push_navigate(socket, to: ~p"/memories?dissolve=#{p <> "/" <> id}")}
+  # Enqueue-only: hand the session to the pipeline worker and stay on the page, surfacing
+  # the result through the same `busy` banner the voyage/notes flows use.
+  def handle_event("dissolve", %{"project" => p, "id" => id} = params, socket) do
+    banner =
+      case Pipeline.enqueue_session(p, id, params["title"]) do
+        {:ok, :queued} -> "Queued for dissolve — the pipeline will distill it into memory."
+        {:ok, :noop} -> "Already queued or dissolved — nothing to do."
+        {:error, reason} -> "Couldn't dissolve: #{inspect(reason)}"
+      end
+
+    {:noreply, assign(socket, busy: banner)}
+  end
 
   @impl true
   def handle_async(:voyage, {:ok, %{date: date}}, socket),
@@ -178,6 +189,7 @@ defmodule OrreryWeb.UserLogLive do
                   phx-click="dissolve"
                   phx-value-project={s.project}
                   phx-value-id={s.id}
+                  phx-value-title={s.title}
                 >
                   <.ph name="drop" /> dissolve
                 </button>

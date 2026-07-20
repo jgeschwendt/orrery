@@ -18,7 +18,7 @@ defmodule OrreryWeb.UI do
   def rail(assigns) do
     ~H"""
     <nav class="rail">
-      <.link navigate="/" class={rail_class(@active == :conversations)} title="Conversations"><.ph name="chats-circle" /></.link>
+      <.link navigate="/" class={rail_class(@active == :board)} title="Board"><.ph name="kanban" /></.link>
       <.link navigate="/log" class={rail_class(@active == :log)} title="Voyage log"><.ph name="compass" /></.link>
       <.link navigate="/memories" class={rail_class(@active == :memories)} title="Memory banks"><.ph name="brain" /></.link>
       <.link navigate="/routines" class={rail_class(@active == :routines)} title="Routines"><.ph name="lightning" /></.link>

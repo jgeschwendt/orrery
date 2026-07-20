@@ -27,9 +27,13 @@ defmodule Orrery.Memory.Pipeline.RunnerTest do
   end
 
   # ── helpers ───────────────────────────────────────────────
-  defp queue_line(map), do: File.write!(Runner.queue_path(), Jason.encode!(map) <> "\n", [:append])
+  defp queue_line(map),
+    do: File.write!(Runner.queue_path(), Jason.encode!(map) <> "\n", [:append])
+
   defp queue_raw(text), do: File.write!(Runner.queue_path(), text, [:append])
-  defp ledger_line(map), do: File.write!(Runner.ledger_path(), Jason.encode!(map) <> "\n", [:append])
+
+  defp ledger_line(map),
+    do: File.write!(Runner.ledger_path(), Jason.encode!(map) <> "\n", [:append])
 
   defp entry(id, opts \\ []) do
     %{

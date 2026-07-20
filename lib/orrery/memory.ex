@@ -281,6 +281,21 @@ defmodule Orrery.Memory do
 
   defp read_bank(id, label), do: read_dir(Path.join(memory_root(), id), id, label, :managed)
 
+  @doc "The `n` most-recently-committed memories across every managed bank, newest-first (full `parse_memory` maps). Sorts by the `updated` frontmatter stamp `commit_memory` writes on each rewrite; feeds the board's COMMITTED lane. Staged candidates are separate (`read_staging/0`) and never appear here."
+  def recent_committed(n) do
+    case File.ls(memory_root()) do
+      {:ok, dirs} ->
+        dirs
+        |> Enum.reject(&(String.starts_with?(&1, ".") or String.starts_with?(&1, "_")))
+        |> Enum.flat_map(&read_bank(&1, "").memories)
+        |> Enum.sort_by(&(&1[:updated] || &1[:created] || ""), :desc)
+        |> Enum.take(n)
+
+      _ ->
+        []
+    end
+  end
+
   # Recover a project's real cwd from a session file (auto-memory dir names are lossy).
   defp project_cwd(project) do
     fallback = Transcripts.decode_project(project)
@@ -362,7 +377,9 @@ defmodule Orrery.Memory do
           # mirror the serialize guard: a malformed recall value must never flow to commit.
           recall: (m["recall"] in ~w(pin index mute) && m["recall"]) || nil,
           # external sessions stage malformed shapes: a non-list replaces must never reach render or commit.
-          replaces: (is_list(m["replaces"]) && Enum.filter(m["replaces"], &(is_binary(&1) and &1 != ""))) || nil,
+          replaces:
+            (is_list(m["replaces"]) && Enum.filter(m["replaces"], &(is_binary(&1) and &1 != ""))) ||
+              nil,
           source: m["source"],
           staged: true,
           type: m["type"] || "reference"

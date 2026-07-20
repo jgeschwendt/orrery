@@ -161,7 +161,9 @@ defmodule Orrery.Memory.Locks do
 
   # ── config ────────────────────────────────────────────────
   # Overridable so tests can shrink the windows they would otherwise wait out.
-  defp commit_budget_ms, do: Application.get_env(:orrery, :lock_commit_budget_ms, @commit_budget_ms)
+  defp commit_budget_ms,
+    do: Application.get_env(:orrery, :lock_commit_budget_ms, @commit_budget_ms)
+
   defp heartbeat_ms, do: Application.get_env(:orrery, :lock_heartbeat_ms, @heartbeat_ms)
 
   defp path(:commit), do: Path.join(Orrery.Memory.memory_root(), @commit_lock)
