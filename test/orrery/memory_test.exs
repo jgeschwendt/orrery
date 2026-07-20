@@ -186,6 +186,53 @@ defmodule Orrery.MemoryTest do
     assert File.read!(Path.join([root, @bank, "reference_pinned_staged.md"])) =~ "recall: pin"
   end
 
+  test "staging normalizes replaces: non-list nil'd, list filtered to non-empty binaries", %{
+    root: root
+  } do
+    staging = [
+      %{
+        bank: @bank,
+        body: "b",
+        description: "d",
+        name: "Empty string replaces",
+        recall: nil,
+        replaces: "",
+        source: nil,
+        type: "reference"
+      },
+      %{
+        bank: @bank,
+        body: "b",
+        description: "d",
+        name: "Junky list replaces",
+        recall: nil,
+        replaces: ["a.md", "", 42],
+        source: nil,
+        type: "reference"
+      },
+      %{
+        bank: @bank,
+        body: "b",
+        description: "d",
+        name: "Valid list replaces",
+        recall: nil,
+        replaces: ["b.md"],
+        source: nil,
+        type: "reference"
+      }
+    ]
+
+    File.write!(Path.join(root, ".staging.json"), Jason.encode!(staging))
+
+    staged = Memory.read_staging()
+    empty = Enum.find(staged, &(&1.name == "Empty string replaces"))
+    junky = Enum.find(staged, &(&1.name == "Junky list replaces"))
+    valid = Enum.find(staged, &(&1.name == "Valid list replaces"))
+    assert empty.replaces == nil
+    assert junky.replaces == ["a.md"]
+    assert valid.replaces == ["b.md"]
+  end
+
   test "unwritable banks are refused" do
     assert {:error, :not_writable} = commit(%{bank: "auto:whatever"})
     assert {:error, :not_writable} = commit(%{bank: "../escape"})

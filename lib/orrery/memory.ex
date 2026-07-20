@@ -360,7 +360,8 @@ defmodule Orrery.Memory do
           name: m["name"],
           # mirror the serialize guard: a malformed recall value must never flow to commit.
           recall: (m["recall"] in ~w(pin index mute) && m["recall"]) || nil,
-          replaces: m["replaces"],
+          # external sessions stage malformed shapes: a non-list replaces must never reach render or commit.
+          replaces: (is_list(m["replaces"]) && Enum.filter(m["replaces"], &(is_binary(&1) and &1 != ""))) || nil,
           source: m["source"],
           staged: true,
           type: m["type"] || "reference"
