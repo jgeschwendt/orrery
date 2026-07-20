@@ -3,23 +3,12 @@ import Config
 # Executed for all environments at boot (after compilation), so it is the place
 # for configuration read from the machine — env vars, secrets.
 
-# Interface bind is opt-in and defaults to loopback. Every route serves ~/.claude
-# contents and mutates it (deletes transcripts, rewrites memory, schedules
-# auto-approved `claude` runs) with NO authentication, so the default is loopback:
-# {127, 0, 0, 1} in dev, {0, 0, 0, 0, 0, 0, 0, 1} (IPv6 loopback) in prod. Setting
-# BIND=0.0.0.0 exposes every route to the entire LAN unauthenticated — a deliberate,
-# temporary decision (e.g. to let another machine POST /feedback), not a default.
+# Every route serves ~/.claude contents and mutates it (deletes transcripts,
+# rewrites memory, schedules auto-approved `claude` runs) with NO authentication,
+# so the endpoint binds loopback only, always — no override. LAN-facing intake
+# (feedback, cross-machine agent chat) lives in the separate `scratchpad` app.
 bind =
-  case System.get_env("BIND") do
-    nil ->
-      if config_env() == :prod, do: {0, 0, 0, 0, 0, 0, 0, 1}, else: {127, 0, 0, 1}
-
-    addr ->
-      case :inet.parse_address(String.to_charlist(addr)) do
-        {:ok, ip} -> ip
-        {:error, _} -> raise "BIND=#{addr} is not a valid IP address"
-      end
-  end
+  if config_env() == :prod, do: {0, 0, 0, 0, 0, 0, 0, 1}, else: {127, 0, 0, 1}
 
 config :orrery, OrreryWeb.Endpoint,
   http: [ip: bind, port: String.to_integer(System.get_env("PORT", "1024"))]

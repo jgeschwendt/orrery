@@ -10,10 +10,6 @@ defmodule OrreryWeb.Router do
     plug :put_secure_browser_headers
   end
 
-  pipeline :api do
-    plug :accepts, ["json"]
-  end
-
   scope "/", OrreryWeb do
     pipe_through :browser
 
@@ -21,12 +17,6 @@ defmodule OrreryWeb.Router do
     live "/log", UserLogLive
     live "/memories", MemoriesLive
     live "/routines", RoutinesLive
-  end
-
-  scope "/", OrreryWeb do
-    pipe_through :api
-
-    post "/feedback", FeedbackController, :create
   end
 
   # Enable LiveDashboard in development
