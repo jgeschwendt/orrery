@@ -22,7 +22,7 @@ defmodule Orrery.Memory.Sweep do
     * **Caps** — at most `max` (default 3) dissolves per run, so a backlog or a
       runaway scheduler can't burn unbounded tokens.
     * **Respect the wrapper** — a live transcript pre-marked archive-on-exit
-      (`@log/.archive-on-exit/<sid>`) belongs to the session-end machinery; skipped.
+      (`archive/.archive-on-exit/<sid>`) belongs to the session-end machinery; skipped.
 
   Mid-session inbox entries (`.staging.json`), the **dissolve queue**
   (`.dissolve-queue.jsonl` — sessions a `/dissolve` explicitly enqueued; their
@@ -47,7 +47,7 @@ defmodule Orrery.Memory.Sweep do
   defdelegate record(entry), to: Runner
 
   defp archive_on_exit_dir,
-    do: "/Users/jlg/.orrery/log/.archive-on-exit"
+    do: "/Users/jlg/.orrery/archive/.archive-on-exit"
 
   @doc """
   One sweep: drain the inbox, consume the dissolve queue, dissolve up to `max` due

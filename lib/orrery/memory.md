@@ -312,7 +312,7 @@ flowchart TD
     RUN --> LS["Transcripts.list_sessions (live)"]
     LS --> SQ{"sweepable?"}
     SQ -->|"idle < 48h"| NO1[skip — may still be resumed]
-    SQ -->|"@log/.archive-on-exit marker"| NO2[skip — session-end machinery owns it]
+    SQ -->|"archive/.archive-on-exit marker"| NO2[skip — session-end machinery owns it]
     SQ -->|"ledger: dissolved/staged"| NO3[skip forever]
     SQ -->|"ledger: trivial, unchanged"| NO4["skip — re-arms if messages grew"]
     SQ -->|yes| MC{"≥ 4 messages?"}
