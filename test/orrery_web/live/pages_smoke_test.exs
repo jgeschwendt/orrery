@@ -33,7 +33,7 @@ defmodule OrreryWeb.PagesSmokeTest do
     assert html_response(get(conn, ~p"/memories"), 200)
   end
 
-  # Reads the real ~/.claude/@routines + launchctl read-only — acceptable on this machine.
+  # Reads the real /Users/jlg/GitHub/jgeschwendt/orrery/data/@routines + launchctl read-only — acceptable on this machine.
   test "GET /routines", %{conn: conn} do
     assert html_response(get(conn, ~p"/routines"), 200)
   end

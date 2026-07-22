@@ -3,12 +3,14 @@ defmodule Orrery.Routines do
   User-defined scheduled routines, each backed by its own macOS launchd
   LaunchAgent. A routine is a name + a schedule + either an unattended `claude`
   prompt or a plain shell `command` (for jobs like the memory sweep where a full
-  claude session would be waste); it is stored in `~/.claude/@routines/routines.json`
+  claude session would be waste); it is stored in
+  `/Users/jlg/GitHub/jgeschwendt/orrery/data/@routines/routines.json`
   and materialized as `<slug>.sh` / `<slug>.prompt.txt` / `com.claude.routines.<slug>.plist`.
 
   launchd *is* the scheduler — nothing runs inside the BEAM. This module reads and
   manages the agents through `launchctl`, mirroring `Orrery.Memory`'s habit of
-  shelling out to `claude` and keeping plain files under `~/.claude`.
+  shelling out to `claude` and keeping plain files under
+  `/Users/jlg/GitHub/jgeschwendt/livebook/data`.
   """
 
   @default_update_prompt """
@@ -459,7 +461,7 @@ defmodule Orrery.Routines do
 
   # ── paths ─────────────────────────────────────────────────
   defp home, do: System.user_home!()
-  defp routines_dir, do: Path.join(home(), ".claude/@routines")
+  defp routines_dir, do: "/Users/jlg/GitHub/jgeschwendt/orrery/data/@routines"
   defp routines_file, do: Path.join(routines_dir(), "routines.json")
   defp result_path(slug), do: Path.join(routines_dir(), "#{slug}.last-run.json")
   defp prompt_path(slug), do: Path.join(routines_dir(), "#{slug}.prompt.txt")

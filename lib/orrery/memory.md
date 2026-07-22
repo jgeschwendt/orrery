@@ -1,6 +1,6 @@
 # The Memory System
 
-One bank per working directory under `~/.claude/@memory`. Sessions read their bank back at
+One bank per working directory under `/Users/jlg/GitHub/jgeschwendt/orrery/data/@memory`. Sessions read their bank back at
 birth, write memories the moment they surface, and are **enqueued whole at death** —
 `/dissolve` appends the session to the dissolve queue and kills it in milliseconds; all
 extraction happens later, server-side. The in-app **`Orrery.Memory.Pipeline`** worker
@@ -72,7 +72,7 @@ flowchart TB
     UI -->|"request_merge / dream via the worker"| PW
     PEV -.->|live card movement| BRD
 
-    C --> BANK[("~/.claude/@memory/&lt;bank&gt;/<br/>&lt;type&gt;_&lt;slug&gt;.md · MEMORY.md ·<br/>_archive/ · _dream.json")]
+    C --> BANK[(".../orrery/data/@memory/&lt;bank&gt;/<br/>&lt;type&gt;_&lt;slug&gt;.md · MEMORY.md ·<br/>_archive/ · _dream.json")]
     BANK --> HOOK
     UI --- BANK
 
@@ -192,7 +192,7 @@ Bank id = cwd with every non-alphanumeric character replaced by `-` (`sanitize/1
 `/Users/jlg/GitHub/jgeschwendt/grove` → `-Users-jlg-GitHub-jgeschwendt-grove`.
 
 ```
-~/.claude/@memory/
+/Users/jlg/GitHub/jgeschwendt/orrery/data/@memory/
 ├── .dissolve-queue.jsonl             # append-only journal — never rewritten; pending is derived
 ├── .staging.json                     # inbox / fallback queue (array of memory maps)
 ├── .sweep.jsonl                      # append-only, id-keyed ledger; newest permanent outcome
@@ -424,7 +424,7 @@ exist only in staging still surface in listings.
 
 | Kind    | Source                                                           | Writable            |
 | ------- | ---------------------------------------------------------------- | ------------------- |
-| managed | `~/.claude/@memory/<bank>/` — this system                        | yes (`writable?/1`) |
+| managed | `/Users/jlg/GitHub/jgeschwendt/orrery/data/@memory/<bank>/` — this system                        | yes (`writable?/1`) |
 | `auto:` | Claude Code's own `projects/*/memory/` dirs                      | read-only           |
 | seeded  | `skills/sandman/memories` corpus, copied once (`.seeded` marker) | as managed          |
 

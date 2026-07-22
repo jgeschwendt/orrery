@@ -1,8 +1,9 @@
 defmodule Orrery.UserLog do
   @moduledoc """
   The log — "what I did" — a day-by-day record for looking back across the year. Plain
-  files under `~/.claude/@log`, one page per day, mirroring `Orrery.Memory`'s habit of
-  keeping markdown under `~/.claude` and shelling out to `claude` for the hard part.
+  files under `/Users/jlg/GitHub/jgeschwendt/orrery/data/@log`, one page per day, mirroring
+  `Orrery.Memory`'s habit of keeping markdown under
+  `/Users/jlg/GitHub/jgeschwendt/livebook/data` and shelling out to `claude` for the hard part.
 
   Each day holds up to two files so the auto and manual halves never clobber each other:
 
@@ -26,7 +27,7 @@ defmodule Orrery.UserLog do
   # ── paths ─────────────────────────────────────────────────
   # Overridable so tests can run against a tmp log instead of the live one.
   def log_root,
-    do: Application.get_env(:orrery, :log_root) || Path.join(System.user_home!(), ".claude/@log")
+    do: Application.get_env(:orrery, :log_root) || "/Users/jlg/GitHub/jgeschwendt/orrery/data/@log"
 
   def archive_root, do: Path.join(log_root(), "archive")
 
@@ -238,12 +239,12 @@ defmodule Orrery.UserLog do
     GATHER the day's conversations (a conversation belongs to the target day if its last
     message timestamp, or failing that the file's modified date, falls on that day):
       - live transcripts:    #{home}/.claude/projects/*/*.jsonl
-      - compact-deleted ones: #{home}/.claude/@log/archive/<TARGET-DATE>/*.jsonl.gz  (gunzip to read)
+      - compact-deleted ones: /Users/jlg/GitHub/jgeschwendt/orrery/data/@log/archive/<TARGET-DATE>/*.jsonl.gz  (gunzip to read)
     Each `.jsonl` is one conversation: newline-delimited JSON, user/assistant messages
     under the `message` key. If there are NO conversations for the day, write nothing and
     stop — do not invent a page.
 
-    WRITE exactly one file: `#{home}/.claude/@log/<TARGET-DATE>.voyage.md`. Overwrite it
+    WRITE exactly one file: `/Users/jlg/GitHub/jgeschwendt/orrery/data/@log/<TARGET-DATE>.voyage.md`. Overwrite it
     if it exists (it is regenerable). Touch NOTHING else — never the matching
     `<TARGET-DATE>.notes.md` (those are the human's own notes) and never any transcript.
 

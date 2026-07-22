@@ -46,7 +46,8 @@ defmodule Orrery.Memory.Sweep do
   @doc "Append one entry to the append-only sweep ledger (stamps `:at`). Public so the inbox drain can record its own audit lines. Delegates to `Runner.record/1`, the ledger's single writer."
   defdelegate record(entry), to: Runner
 
-  defp archive_on_exit_dir, do: Path.join(System.user_home!(), ".claude/@log/.archive-on-exit")
+  defp archive_on_exit_dir,
+    do: "/Users/jlg/GitHub/jgeschwendt/orrery/data/@log/.archive-on-exit"
 
   @doc """
   One sweep: drain the inbox, consume the dissolve queue, dissolve up to `max` due
