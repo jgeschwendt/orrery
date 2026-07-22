@@ -54,7 +54,7 @@ defmodule Orrery.Transcripts do
 
   @doc """
   Compact-delete a session's transcript: gzip-archive it under the
-  `@log/archive/YYYY-MM-DD/` (recoverable, fuel for the voyage log — same contract as
+  `~/.orrery/archive/YYYY-MM-DD/` (recoverable, fuel for the voyage log — same contract as
   `/delete`), then remove the live file and notify subscribers. The live file is only
   removed once the archive is safely written; returns `:ok` or `{:error, reason}`.
   """

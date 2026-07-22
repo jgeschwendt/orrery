@@ -23,6 +23,7 @@ defmodule OrreryWeb.BoardLiveTest do
     Application.put_env(:orrery, :memory_root, memory)
     Application.put_env(:orrery, :projects_dir, projects)
     Application.put_env(:orrery, :log_root, log)
+    Application.put_env(:orrery, :archive_root, Path.join(log, "archive"))
 
     # A guard: the trivial sessions below never reach a claude call, but stub the seam so
     # nothing can ever shell out to the real CLI during a test.
@@ -34,6 +35,7 @@ defmodule OrreryWeb.BoardLiveTest do
       Application.delete_env(:orrery, :memory_root)
       Application.delete_env(:orrery, :projects_dir)
       Application.delete_env(:orrery, :log_root)
+      Application.delete_env(:orrery, :archive_root)
       Application.delete_env(:orrery, :claude_runner)
       File.rm_rf!(base)
     end)

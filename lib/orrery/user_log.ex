@@ -14,7 +14,7 @@ defmodule Orrery.UserLog do
   The voyage log is the log's sibling to `Memory`'s dissolve: dissolve distills one
   conversation into durable memories; the voyage log distills a whole *day* into one page.
   When a session is killed (`/delete` / `/dissolve`), its raw transcript is "compact-deleted"
-  — gzip-archived under `archive/YYYY-MM-DD/` rather than removed — so the voyage log still
+  — gzip-archived under `~/.orrery/archive/YYYY-MM-DD/` rather than removed — so the voyage log still
   has the day's conversations to draw on and nothing is lost. The lone exception is
   `/delete hard`, which erases the transcript outright (no archive) and so never feeds the
   voyage log.
@@ -29,7 +29,11 @@ defmodule Orrery.UserLog do
   def log_root,
     do: Application.get_env(:orrery, :log_root) || "/Users/jlg/.orrery/log"
 
-  def archive_root, do: Path.join(log_root(), "archive")
+  # An independent top-level home — not derived from log_root — so the archive can
+  # live outside the log. Overridable so tests can run against a tmp dir instead of
+  # the live one.
+  def archive_root,
+    do: Application.get_env(:orrery, :archive_root) || "/Users/jlg/.orrery/archive"
 
   defp voyage_path(date), do: Path.join(log_root(), "#{date}.voyage.md")
   defp notes_path(date), do: Path.join(log_root(), "#{date}.notes.md")
@@ -239,7 +243,7 @@ defmodule Orrery.UserLog do
     GATHER the day's conversations (a conversation belongs to the target day if its last
     message timestamp, or failing that the file's modified date, falls on that day):
       - live transcripts:    #{home}/.claude/projects/*/*.jsonl
-      - compact-deleted ones: /Users/jlg/.orrery/log/archive/<TARGET-DATE>/*.jsonl.gz  (gunzip to read)
+      - compact-deleted ones: /Users/jlg/.orrery/archive/<TARGET-DATE>/*.jsonl.gz  (gunzip to read)
     Each `.jsonl` is one conversation: newline-delimited JSON, user/assistant messages
     under the `message` key. If there are NO conversations for the day, write nothing and
     stop — do not invent a page.

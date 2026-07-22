@@ -14,11 +14,13 @@ defmodule Orrery.Memory.Pipeline.RunnerTest do
     Application.put_env(:orrery, :memory_root, memory)
     Application.put_env(:orrery, :projects_dir, projects)
     Application.put_env(:orrery, :log_root, log)
+    Application.put_env(:orrery, :archive_root, Path.join(log, "archive"))
 
     on_exit(fn ->
       Application.delete_env(:orrery, :memory_root)
       Application.delete_env(:orrery, :projects_dir)
       Application.delete_env(:orrery, :log_root)
+      Application.delete_env(:orrery, :archive_root)
       Application.delete_env(:orrery, :claude_runner)
       File.rm_rf!(base)
     end)

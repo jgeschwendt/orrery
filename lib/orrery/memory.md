@@ -30,7 +30,7 @@ flowchart TB
     Q[".dissolve-queue.jsonl — append-only journal<br/>{id, cwd, title, queued_at, source}"]
     DIS -->|enqueue.sh| Q
     DIS -->|then invokes| DEL
-    DEL -->|"archive + finalize<br/>(delete-session.sh; hard mode skips the archive,<br/>erases the .jsonl outright)"| ARC["@log/archive/&lt;date&gt;/&lt;sid&gt;.jsonl.gz<br/>(recoverable, un-resumable)"]
+    DEL -->|"archive + finalize<br/>(delete-session.sh; hard mode skips the archive,<br/>erases the .jsonl outright)"| ARC["~/.orrery/archive/&lt;date&gt;/&lt;sid&gt;.jsonl.gz<br/>(recoverable, un-resumable)"]
 
     subgraph pipeline["One pipeline: extract → judge → commit"]
         X[extract candidates]
@@ -265,7 +265,7 @@ sequenceDiagram
     participant S as dying session
     participant Q as .dissolve-queue.jsonl
     participant D as delete-session.sh
-    participant A as @log/archive
+    participant A as ~/.orrery/archive
 
     S->>S: stage anything the NEXT session needs<br/>(usually already staged at time of attention)
     S->>Q: enqueue.sh — append {id, cwd, title, queued_at}
@@ -467,7 +467,7 @@ with it.
 
 ```mermaid
 flowchart LR
-    T["projects/&lt;proj&gt;/&lt;sid&gt;.jsonl<br/>(live transcript)"] -->|"/dissolve · /delete (default) ·<br/>dashboard dissolve · hourly sweep"| G["@log/archive/&lt;date&gt;/&lt;sid&gt;.jsonl.gz"]
+    T["projects/&lt;proj&gt;/&lt;sid&gt;.jsonl<br/>(live transcript)"] -->|"/dissolve · /delete (default) ·<br/>dashboard dissolve · hourly sweep"| G["~/.orrery/archive/&lt;date&gt;/&lt;sid&gt;.jsonl.gz"]
     T -->|"/delete hard — explicit erase"| ERASED["∅ erased outright<br/>(no archive, unrecoverable)"]
     G --> DRM["voyage log (fuel)"]
     G --> QX["dissolve-queue extraction<br/>(parse_archived/1)"]

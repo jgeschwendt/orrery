@@ -27,7 +27,9 @@ defmodule Orrery.UserLogTest do
       root = Path.join(System.tmp_dir!(), "user_log_days_#{System.unique_integer([:positive])}")
       File.mkdir_p!(root)
       Application.put_env(:orrery, :log_root, root)
+      Application.put_env(:orrery, :archive_root, Path.join(root, "archive"))
       on_exit(fn -> Application.delete_env(:orrery, :log_root) end)
+      on_exit(fn -> Application.delete_env(:orrery, :archive_root) end)
       on_exit(fn -> File.rm_rf!(root) end)
 
       File.write!(Path.join(root, "2026-07-18.voyage.md"), """
