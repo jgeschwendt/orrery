@@ -7,5 +7,3 @@
 !/priv/static/assets/fonts/
 /priv/static/cache_manifest.json
 
-# machine-local Claude substrate — memory banks, logs, routines, research (moved from ~/.claude 2026-07-21)
-/data/

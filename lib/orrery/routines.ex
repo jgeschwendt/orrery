@@ -4,7 +4,7 @@ defmodule Orrery.Routines do
   LaunchAgent. A routine is a name + a schedule + either an unattended `claude`
   prompt or a plain shell `command` (for jobs like the memory sweep where a full
   claude session would be waste); it is stored in
-  `/Users/jlg/GitHub/jgeschwendt/orrery/data/@routines/routines.json`
+  `/Users/jlg/.orrery/routines/routines.json`
   and materialized as `<slug>.sh` / `<slug>.prompt.txt` / `com.claude.routines.<slug>.plist`.
 
   launchd *is* the scheduler — nothing runs inside the BEAM. This module reads and
@@ -461,7 +461,7 @@ defmodule Orrery.Routines do
 
   # ── paths ─────────────────────────────────────────────────
   defp home, do: System.user_home!()
-  defp routines_dir, do: "/Users/jlg/GitHub/jgeschwendt/orrery/data/@routines"
+  defp routines_dir, do: "/Users/jlg/.orrery/routines"
   defp routines_file, do: Path.join(routines_dir(), "routines.json")
   defp result_path(slug), do: Path.join(routines_dir(), "#{slug}.last-run.json")
   defp prompt_path(slug), do: Path.join(routines_dir(), "#{slug}.prompt.txt")

@@ -47,7 +47,7 @@ defmodule Orrery.Memory.Sweep do
   defdelegate record(entry), to: Runner
 
   defp archive_on_exit_dir,
-    do: "/Users/jlg/GitHub/jgeschwendt/orrery/data/@log/.archive-on-exit"
+    do: "/Users/jlg/.orrery/log/.archive-on-exit"
 
   @doc """
   One sweep: drain the inbox, consume the dissolve queue, dissolve up to `max` due

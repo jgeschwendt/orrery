@@ -1,7 +1,7 @@
 defmodule Orrery.Watcher do
   @moduledoc """
-  Watches `~/.claude/projects` (transcripts), `/Users/jlg/GitHub/jgeschwendt/orrery/data/@memory`
-  (banks), and `/Users/jlg/GitHub/jgeschwendt/orrery/data/@log` (the log) and broadcasts
+  Watches `~/.claude/projects` (transcripts), `/Users/jlg/.orrery/memory`
+  (banks), and `/Users/jlg/.orrery/log` (the log) and broadcasts
   coalesced change events over PubSub.
   LiveViews subscribe and re-render — no API/fetch/WebSocket glue.
 
