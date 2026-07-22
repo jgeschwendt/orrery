@@ -3,10 +3,12 @@ import Config
 # Executed for all environments at boot (after compilation), so it is the place
 # for configuration read from the machine — env vars, secrets.
 
-# Every route serves ~/.claude contents and mutates it (deletes transcripts,
-# rewrites memory, schedules auto-approved `claude` runs) with NO authentication,
-# so the endpoint binds loopback only, always — no override. LAN-facing intake
+# Every route serves and mutates ~/.orrery (rewrites memory, schedules
+# auto-approved `claude` runs) and deletes transcripts in place under
+# ~/.claude/projects, with NO authentication, so the endpoint binds loopback
+# only, always — no override. LAN-facing intake
 # (feedback, cross-machine agent chat) lives in the separate `scratchpad` app.
+# stele:landmark loopback-bind
 bind =
   if config_env() == :prod, do: {0, 0, 0, 0, 0, 0, 0, 1}, else: {127, 0, 0, 1}
 

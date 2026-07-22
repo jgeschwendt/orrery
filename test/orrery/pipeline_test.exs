@@ -37,7 +37,7 @@ defmodule Orrery.Memory.PipelineTest do
   end
 
   # ── helpers ───────────────────────────────────────────────
-  # An archived (gzip) transcript under the @log archive — enqueue accepts a session
+  # An archived (gzip) transcript under ~/.orrery/archive — enqueue accepts a session
   # that is already archived, and the worker reads it via `Transcripts.parse_archived/1`.
   defp write_archive(log, id, texts) do
     dir = Path.join([log, "archive", "2026-07-13"])

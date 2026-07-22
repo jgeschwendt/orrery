@@ -204,6 +204,7 @@ defmodule OrreryWeb.BoardComponents do
   attr :label, :string, default: "Details"
   slot :inner_block, required: true
 
+  # stele:landmark click-away-drawer
   def drawer(assigns) do
     ~H"""
     <div class="drawer-bg">

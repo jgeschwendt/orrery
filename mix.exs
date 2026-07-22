@@ -67,7 +67,9 @@ defmodule Orrery.MixProject do
         "compile --warnings-as-errors",
         "deps.unlock --unused",
         "format",
-        "cmd env MIX_ENV=test mix test"
+        "cmd env MIX_ENV=test mix test",
+        "cmd stele check",
+        "cmd stele emit --check"
       ]
     ]
   end

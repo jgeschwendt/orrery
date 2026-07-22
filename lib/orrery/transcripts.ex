@@ -89,7 +89,7 @@ defmodule Orrery.Transcripts do
   defp project_of(file), do: file |> Path.relative_to(projects_dir()) |> Path.split() |> hd()
 
   @doc """
-  Parse a session from its newest gzip archive in the @log archive — how the dissolve-queue
+  Parse a session from its newest gzip archive in `~/.orrery/archive` — how the dissolve-queue
   consumer reads transcripts that `/delete` already archived. Returns nil when no
   archive exists yet (the session may still be finalizing) or it doesn't parse.
   """

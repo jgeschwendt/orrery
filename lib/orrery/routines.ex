@@ -10,7 +10,7 @@ defmodule Orrery.Routines do
   launchd *is* the scheduler — nothing runs inside the BEAM. This module reads and
   manages the agents through `launchctl`, mirroring `Orrery.Memory`'s habit of
   shelling out to `claude` and keeping plain files under
-  `/Users/jlg/GitHub/jgeschwendt/livebook/data`.
+  `/Users/jlg/.orrery`.
   """
 
   @default_update_prompt """
@@ -33,7 +33,8 @@ defmodule Orrery.Routines do
 
   @default_routines [
     %{
-      "command" => "cd $HOME/.claude && $HOME/.local/bin/mise exec -- mix memory.sweep",
+      "command" =>
+        "cd $HOME/GitHub/jgeschwendt/orrery && $HOME/.local/bin/mise exec -- mix memory.sweep",
       "name" => "Memory sweep",
       "schedule" => %{"seconds" => 3600, "type" => "interval"},
       "slug" => "memory-sweep"

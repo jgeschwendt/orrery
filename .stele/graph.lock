@@ -1,0 +1,150 @@
+{
+  "adrs": {},
+  "landmarks": {
+    "archive-on-delete": {
+      "file": "lib/orrery/memory.ex",
+      "line": 543,
+      "node": "lib"
+    },
+    "click-away-drawer": {
+      "file": "lib/orrery_web/components/board_components.ex",
+      "line": 207,
+      "node": "lib"
+    },
+    "loopback-bind": {
+      "file": "config/runtime.exs",
+      "line": 11,
+      "node": "/"
+    },
+    "memory-root": {
+      "file": "lib/orrery/memory.ex",
+      "line": 86,
+      "node": "lib"
+    }
+  },
+  "nodes": {
+    "/": {
+      "budget": null,
+      "claims": [
+        {
+          "anchor": "lm:loopback-bind",
+          "enforced_by": null,
+          "id": "loopback-bind",
+          "kind": "invariant",
+          "resolved": "config/runtime.exs:11",
+          "text": "the endpoint binds loopback only, always — every route mutates ~/.claude with no authentication, so there is no bind override; LAN-facing intake belongs to the separate scratchpad app",
+          "verified": {
+            "digest": "bfc393ca72f07d7710968d93f9e52202b73952f8775fb3629bce42d5bfea7837",
+            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+          }
+        }
+      ],
+      "commands": {
+        "precommit": "mix precommit",
+        "server": "mise exec -- mix phx.server",
+        "setup": "mise exec -- mix setup",
+        "test": "mix test"
+      },
+      "contains": [
+        "lib",
+        "test"
+      ],
+      "declared": {
+        "allow": [],
+        "decided_by": [],
+        "depends": [
+          "lib"
+        ]
+      },
+      "extracted": {
+        "imports": [
+          "lib"
+        ]
+      },
+      "id": "/",
+      "kind": "system",
+      "purpose": "Phoenix app behind ~/.claude — memory sweep pipeline, launchd routines, voyage log, dashboard LiveViews. Code lives here; all data lives under ~/.orrery and ~/.claude, never the repo tree."
+    },
+    "lib": {
+      "budget": null,
+      "claims": [
+        {
+          "anchor": "lm:archive-on-delete",
+          "enforced_by": null,
+          "id": "archive-on-delete",
+          "kind": "invariant",
+          "resolved": "lib/orrery/memory.ex:543",
+          "text": "memories are never destroyed — supersede and delete both move the file to the bank's _archive/, so every autonomous rewrite stays recoverable",
+          "verified": {
+            "digest": "d436c08f445159319cf1a031d1aead7b463fc39f463c06ac10295c75a2955e5c",
+            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+          }
+        },
+        {
+          "anchor": "lm:click-away-drawer",
+          "enforced_by": null,
+          "id": "click-away-drawer",
+          "kind": "hazard",
+          "resolved": "lib/orrery_web/components/board_components.ex:207",
+          "text": "an inline onclick stopPropagation wrapper kills every nested phx-click (LiveView's listener is delegated) and no LiveViewTest can catch it — use phx-click-away instead",
+          "verified": {
+            "digest": "c5fc9e8aaf1542d59d881b148f50ab610576d1929bc1612b2e6be40cda8ef58b",
+            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+          }
+        },
+        {
+          "anchor": "lm:memory-root",
+          "enforced_by": null,
+          "id": "memory-root",
+          "kind": "invariant",
+          "resolved": "lib/orrery/memory.ex:86",
+          "text": "every data root resolves through Application.get_env(:orrery, …) with a ~/.orrery default — tests repoint roots at tmp dirs through that seam, nothing reaches past it",
+          "verified": {
+            "digest": "fa606209355f94e943b22a6244fd9357a9e3e6ef1db33364dfb3bc93b64484a8",
+            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+          }
+        }
+      ],
+      "commands": {
+        "test": "mix test"
+      },
+      "contains": [],
+      "declared": {
+        "allow": [],
+        "decided_by": [],
+        "depends": []
+      },
+      "extracted": {
+        "imports": []
+      },
+      "id": "lib",
+      "kind": "container",
+      "purpose": "Orrery.* domain — memory banks + sweep pipeline, transcripts, voyage log, routines, watcher, file Store — and OrreryWeb.* dashboard LiveViews. No database; the filesystem under ~/.orrery is the store."
+    },
+    "test": {
+      "budget": null,
+      "claims": [],
+      "commands": {
+        "failed": "mix test --failed",
+        "test": "mix test"
+      },
+      "contains": [],
+      "declared": {
+        "allow": [],
+        "decided_by": [],
+        "depends": [
+          "lib"
+        ]
+      },
+      "extracted": {
+        "imports": [
+          "lib"
+        ]
+      },
+      "id": "test",
+      "kind": "container",
+      "purpose": "ExUnit suite. Any test touching data must repoint the :orrery roots (memory_root, log_root, projects_dir, …) at tmp dirs via Application.put_env — the suite never reads or writes the real ~/.orrery."
+    }
+  },
+  "version": 1
+}
