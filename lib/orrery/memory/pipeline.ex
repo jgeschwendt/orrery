@@ -171,7 +171,7 @@ defmodule Orrery.Memory.Pipeline do
   end
 
   # A live transcript is archived (then removed) now — identical to `/dissolve`+`/delete`.
-  # With no live transcript, an existing @log archive is enough; neither → not found.
+  # With no live transcript, an existing ~/.orrery/archive copy is enough; neither → not found.
   defp ensure_archived(project, id) do
     cond do
       Transcripts.get_session(project, id) != nil ->

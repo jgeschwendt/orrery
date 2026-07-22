@@ -47,7 +47,7 @@ flowchart TB
         PEV["broadcasts on the &quot;pipeline&quot; topic:<br/>queued · extracting · judging · waiting · done · error"]
         PW --- PEV
     end
-    WK["kick: Watcher .jsonl-under-@memory (~150 ms)<br/>· 5-min tick · enqueue_session call"] -.-> PW
+    WK["kick: Watcher .jsonl-under-~/.orrery/memory (~150 ms)<br/>· 5-min tick · enqueue_session call"] -.-> PW
     Q --> PW
     ARC -->|"parse_archived/1"| PW
     PW --> X

@@ -83,6 +83,7 @@ defmodule Orrery.Memory do
 
   # ── paths ─────────────────────────────────────────────────
   # Overridable so tests can run against a tmp store instead of the live one.
+  # stele:landmark memory-root
   def memory_root,
     do:
       Application.get_env(:orrery, :memory_root) ||
@@ -539,6 +540,7 @@ defmodule Orrery.Memory do
   end
 
   @doc "Archive (never destroy) a committed memory of a managed bank: moves the file to `_archive/` (recoverable via `restore_memory/2`) and regens the index. Returns `{:error, :not_writable}` for an auto/unsafe bank. Both the dream's archive op and the dashboard delete button route here."
+  # stele:landmark archive-on-delete
   def delete_memory(bank, file) do
     locked(fn ->
       if writable?(bank) and Orrery.Store.component?(file) do
@@ -703,7 +705,7 @@ defmodule Orrery.Memory do
 
   @doc """
   Distill an already-parsed session map — the shared core of `distill_session/2` and
-  the dissolve-queue consumer (which parses from the @log archive instead of a live
+  the dissolve-queue consumer (which parses from `~/.orrery/archive` instead of a live
   transcript). Same result contract as `distill_session/2`.
 
   `:progress` is a 1-arity callback the pipeline worker uses to broadcast stage

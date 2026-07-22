@@ -126,8 +126,8 @@ defmodule OrreryWeb.BoardLive do
   end
 
   # ── events: drawer ────────────────────────────────────────
-  # A conversation opens its transcript: the live file first, else the @log archive the
-  # dissolve already wrote, else the "consumed" empty state.
+  # A conversation opens its transcript: the live file first, else the ~/.orrery/archive
+  # copy the dissolve already wrote, else the "consumed" empty state.
   def handle_event("open_card", %{"id" => id} = params, socket) do
     session =
       (params["project"] && params["project"] != "" &&

@@ -1,0 +1,2 @@
+[exhaustiveness]
+exclude = ["_build", "assets", "config", "deps", "node_modules", "priv", "target"]
