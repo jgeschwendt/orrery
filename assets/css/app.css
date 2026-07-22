@@ -331,6 +331,9 @@ body::after {
   background: var(--glass-2);
   border-color: var(--line-2);
 }
+.item.disabled {
+  opacity: 0.55;
+}
 .item .title {
   white-space: nowrap;
   overflow: hidden;

@@ -10,6 +10,10 @@ defmodule Orrery.Routines do
   launchd *is* the scheduler — nothing runs inside the BEAM. This module reads and
   manages the agents through `launchctl`, mirroring `Orrery.Memory`'s habit of
   shelling out to `claude` and keeping plain files under `~/.orrery`.
+
+  A routine may be disabled via a `"disabled" => true` flag in routines.json
+  (absent = enabled); disabling boots out its agent and removes the plist so a
+  login can't resurrect it, and enabling re-materializes the agent.
   """
 
   @default_update_prompt """
@@ -82,6 +86,7 @@ defmodule Orrery.Routines do
       slug = r["slug"]
 
       Map.merge(r, %{
+        "disabled" => r["disabled"] == true,
         "installed" => File.exists?(plist_path(slug)),
         "last_run" => last_run(slug),
         "loaded" => loaded?(slug)
@@ -120,6 +125,9 @@ defmodule Orrery.Routines do
           {:error, "routine not found"}
 
         old ->
+          # Map.drop only strips command/prompt, so a `"disabled"` flag on `old`
+          # survives the rebuild — a disabled routine stays disabled when edited, and
+          # we skip materialization (it re-materializes at enable, not before).
           routine =
             old
             |> Map.drop(["command", "prompt"])
@@ -127,7 +135,7 @@ defmodule Orrery.Routines do
             |> Map.merge(attrs.run)
 
           write_routines(Enum.map(routines, &if(&1["slug"] == slug, do: routine, else: &1)))
-          install_agent(routine)
+          unless routine["disabled"] == true, do: install_agent(routine)
           {:ok, routine}
       end
     end
@@ -159,15 +167,74 @@ defmodule Orrery.Routines do
   @doc "Force a routine to run now, loading its agent first if needed."
   def run_now(slug) do
     if Orrery.Store.component?(slug) do
-      if (r = get(slug)) && not loaded?(slug), do: install_agent(r)
+      r = get(slug)
 
-      {out, code} =
-        System.cmd("launchctl", ["kickstart", "-k", service(slug)], stderr_to_stdout: true)
+      if r && r["disabled"] == true do
+        {:error, :disabled}
+      else
+        if r && not loaded?(slug), do: install_agent(r)
 
-      if code == 0, do: :ok, else: {:error, String.trim(out)}
+        {out, code} =
+          System.cmd("launchctl", ["kickstart", "-k", service(slug)], stderr_to_stdout: true)
+
+        if code == 0, do: :ok, else: {:error, String.trim(out)}
+      end
     else
       {:error, :invalid_slug}
     end
+  end
+
+  @doc """
+  Disable a routine: persist the flag, boot its agent out, and remove the plist —
+  the plist MUST go, since launchd auto-loads `~/Library/LaunchAgents` at login.
+  Script/prompt/log/last-run files are kept. Returns `:ok`.
+  """
+  def disable(slug) do
+    cond do
+      not Orrery.Store.component?(slug) -> {:error, :invalid_slug}
+      get(slug) == nil -> {:error, "routine not found"}
+      true -> do_disable(slug)
+    end
+  end
+
+  defp do_disable(slug) do
+    put_disabled(slug, true)
+    if loaded?(slug), do: bootout(slug)
+    File.rm(plist_path(slug))
+    :ok
+  end
+
+  @doc "Enable a previously disabled routine: drop the flag and re-materialize its agent. Returns `:ok`."
+  def enable(slug) do
+    cond do
+      not Orrery.Store.component?(slug) -> {:error, :invalid_slug}
+      get(slug) == nil -> {:error, "routine not found"}
+      true -> do_enable(slug)
+    end
+  end
+
+  defp do_enable(slug) do
+    install_agent(put_disabled(slug, false))
+    :ok
+  end
+
+  # JSON-flag persistence only — set or clear `"disabled"` on the stored routine map,
+  # leaving every launchd call to the caller. Returns the updated routine map. Kept
+  # separate from disable/enable's launchd side for testability; `@doc false` so tests
+  # can drive both directions without materializing a real agent.
+  @doc false
+  def put_disabled(slug, disabled?) do
+    updated =
+      Enum.map(read_routines(), fn r ->
+        cond do
+          r["slug"] != slug -> r
+          disabled? -> Map.put(r, "disabled", true)
+          true -> Map.delete(r, "disabled")
+        end
+      end)
+
+    write_routines(updated)
+    Enum.find(updated, &(&1["slug"] == slug))
   end
 
   # ── form params <-> schedule ──────────────────────────────

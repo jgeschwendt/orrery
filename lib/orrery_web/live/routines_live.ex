@@ -84,6 +84,12 @@ defmodule OrreryWeb.RoutinesLive do
     {:noreply, socket |> assign(busy: "Routine removed.", selected: nil) |> load()}
   end
 
+  def handle_event("disable", %{"slug" => slug}, socket),
+    do: {:noreply, toggle(socket, Routines.disable(slug), "Disabled — launchd agent removed.")}
+
+  def handle_event("enable", %{"slug" => slug}, socket),
+    do: {:noreply, toggle(socket, Routines.enable(slug), "Enabled — agent loaded.")}
+
   def handle_event("refresh", _, socket), do: {:noreply, load(socket)}
 
   @impl true
@@ -109,7 +115,11 @@ defmodule OrreryWeb.RoutinesLive do
         <div class="list">
           <div
             :for={r <- @routines}
-            class={["item", @active && @active["slug"] == r["slug"] && "active"]}
+            class={[
+              "item",
+              @active && @active["slug"] == r["slug"] && "active",
+              r["disabled"] && "disabled"
+            ]}
             phx-click="select"
             phx-value-slug={r["slug"]}
             title={r["name"]}
@@ -130,11 +140,36 @@ defmodule OrreryWeb.RoutinesLive do
           <div class="bar">
             <h2>{@active["name"]}</h2>
             <span class="tag">{Routines.schedule_label(@active["schedule"])}</span>
-            <span class="tag">{if @active["loaded"], do: "loaded in launchd", else: "not loaded"}</span>
+            <span :if={@active["disabled"]} class="tag">disabled</span>
+            <span :if={!@active["disabled"]} class="tag">
+              {if @active["loaded"], do: "loaded in launchd", else: "not loaded"}
+            </span>
             <span class="tag">{(@active["last_run"] && @active["last_run"]["finished"]) || "never run"}</span>
-            <button class="btn ok" phx-click="run_now" phx-value-slug={@active["slug"]}><.ph name="play" />
-            run now</button>
+            <button
+              :if={!@active["disabled"]}
+              class="btn ok"
+              phx-click="run_now"
+              phx-value-slug={@active["slug"]}
+            >
+              <.ph name="play" /> run now
+            </button>
             <button class="btn" phx-click="edit"><.ph name="pencil-simple" /> edit</button>
+            <button
+              :if={!@active["disabled"]}
+              class="btn"
+              phx-click="disable"
+              phx-value-slug={@active["slug"]}
+            >
+              <.ph name="pause" /> disable
+            </button>
+            <button
+              :if={@active["disabled"]}
+              class="btn"
+              phx-click="enable"
+              phx-value-slug={@active["slug"]}
+            >
+              <.ph name="power" /> enable
+            </button>
             <button
               class="btn warn"
               phx-click="delete"
@@ -216,6 +251,9 @@ defmodule OrreryWeb.RoutinesLive do
     </div>
     """
   end
+
+  defp toggle(socket, :ok, msg), do: socket |> assign(busy: msg) |> load()
+  defp toggle(socket, {:error, e}, _msg), do: assign(socket, busy: "Error: #{e}")
 
   defp log_or_empty(""), do: "No runs yet. Press “run now” to trigger one."
   defp log_or_empty(log), do: log
