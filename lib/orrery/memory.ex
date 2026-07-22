@@ -1,7 +1,7 @@
 defmodule Orrery.Memory do
   @moduledoc """
   Sandman-shaped memory banks: one bank per sanitized-cwd under
-  `/Users/jlg/.orrery/memory`,
+  `~/.orrery/memory`,
   plus Claude Code's read-only built-in banks. Memories use sandman frontmatter
   (`name`/`description`/`type`, plus bi-temporal `created`/`updated` and a `source`
   session id) and `<type>_<slug>.md` filenames. Whole conversations are dissolved via
@@ -87,7 +87,7 @@ defmodule Orrery.Memory do
   def memory_root,
     do:
       Application.get_env(:orrery, :memory_root) ||
-        "/Users/jlg/.orrery/memory"
+        Path.join(System.user_home!(), ".orrery/memory")
 
   defp sandman_root, do: Path.join(System.user_home!(), ".claude/skills/sandman/memories")
   defp staging_path, do: Path.join(memory_root(), ".staging.json")

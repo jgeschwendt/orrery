@@ -19,9 +19,9 @@ The code lives in this repo; the data it reads and mutates stays under `~/.orrer
 | user log | `~/.orrery/log` | `config :orrery, :log_root` |
 | transcript archive | `~/.orrery/archive` | `config :orrery, :archive_root` |
 | transcripts | `~/.claude/projects` | `config :orrery, :projects_dir` |
-| routines | `~/.orrery/routines` | — |
+| routines | `~/.orrery/routines` | `config :orrery, :routines_dir` |
 
-Memory, log, and archive defaults are hardcoded `/Users/jlg/.orrery/...` literals; only transcripts and routines resolve against `System.user_home!()` at runtime. Every key but routines is overridable via `Application.get_env(:orrery, ...)` (routines is fixed) — the tests point the roots at fixtures this way.
+Every default resolves against `System.user_home!()` at runtime — no hardcoded home paths — and every key is overridable via `Application.get_env(:orrery, ...)`; the tests point the roots at fixtures this way.
 
 ## Setup
 

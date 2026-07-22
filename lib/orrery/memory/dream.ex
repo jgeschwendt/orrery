@@ -3,7 +3,7 @@ defmodule Orrery.Memory.Dream do
   The dream: the sleep-time pass — between sessions, spend compute making each bank
   *smaller and sharper* rather than waiting for recall to fail. (Offline consolidation
   is the best-evidenced quality axis for a personal memory bank — see
-  `/Users/jlg/.claude/skills/gigaresearch/workspaces/claude-memory-system/report.md`.) (The memory pass formerly
+  the claude-memory-system gigaresearch report.) (The memory pass formerly
   labeled consolidation; distinct from the voyage log (Orrery.UserLog).)
 
   A bank is due when it has gained `@growth_trigger`+ memories since its last pass and

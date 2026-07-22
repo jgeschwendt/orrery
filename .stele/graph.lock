@@ -35,7 +35,7 @@
           "text": "the endpoint binds loopback only, always — every route mutates ~/.claude with no authentication, so there is no bind override; LAN-facing intake belongs to the separate scratchpad app",
           "verified": {
             "digest": "bfc393ca72f07d7710968d93f9e52202b73952f8775fb3629bce42d5bfea7837",
-            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+            "sha": "2d448724c07018f7a8ea7cc3b5157cd79a3749c3"
           }
         }
       ],
@@ -77,7 +77,7 @@
           "text": "memories are never destroyed — supersede and delete both move the file to the bank's _archive/, so every autonomous rewrite stays recoverable",
           "verified": {
             "digest": "d436c08f445159319cf1a031d1aead7b463fc39f463c06ac10295c75a2955e5c",
-            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+            "sha": "2d448724c07018f7a8ea7cc3b5157cd79a3749c3"
           }
         },
         {
@@ -89,7 +89,7 @@
           "text": "an inline onclick stopPropagation wrapper kills every nested phx-click (LiveView's listener is delegated) and no LiveViewTest can catch it — use phx-click-away instead",
           "verified": {
             "digest": "c5fc9e8aaf1542d59d881b148f50ab610576d1929bc1612b2e6be40cda8ef58b",
-            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+            "sha": "2d448724c07018f7a8ea7cc3b5157cd79a3749c3"
           }
         },
         {
@@ -100,8 +100,8 @@
           "resolved": "lib/orrery/memory.ex:86",
           "text": "every data root resolves through Application.get_env(:orrery, …) with a ~/.orrery default — tests repoint roots at tmp dirs through that seam, nothing reaches past it",
           "verified": {
-            "digest": "fa606209355f94e943b22a6244fd9357a9e3e6ef1db33364dfb3bc93b64484a8",
-            "sha": "a3565252b9aa92fa492b67e268855dc564a0c856"
+            "digest": "0850ae3530dcafdbfde4df27803888819500b8a08f1a820a8ca75950767b2309",
+            "sha": "2d448724c07018f7a8ea7cc3b5157cd79a3749c3"
           }
         }
       ],
